@@ -115,7 +115,7 @@ $marginX = 100; $y = 110
 # Cabeçalho correto
 
 # \u00ED = í
-$g.DrawString("Not"+[char]0x00ED+"cias SEPLAN-RN", $headerFont, $white, $marginX, $y)
+$g.DrawString("Not"+[char]0x00ED+"cias SEPLAN", $headerFont, $white, $marginX, $y)
 $y += 86; $g.FillRectangle($accent, $marginX, $y, 620, 6); $y += 34
 
 
