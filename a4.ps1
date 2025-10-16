@@ -11,6 +11,7 @@ function Fail($msg) { Write-Error $msg; exit 1 }
 $baseWallpaper = Join-Path (Get-Location) "fundo.png"
 
 # ===== Endpoint WP =====
+# Mantém _embed=1 para obter imagem destacada no payload
 $apiUrl = "https://www.seplan.rn.gov.br/wp-json/wp/v2/materia?per_page=20&page=1&_embed=1"
 
 # ===== Busca JSON =====
@@ -27,6 +28,7 @@ function LimpaHtml($s) {
   $s = [System.Web.HttpUtility]::HtmlDecode($s)
   return $s.Trim()
 }
+
 try {
   $items = $resp.Content | ConvertFrom-Json
 } catch { Fail "Falha ao converter JSON: $_" }
@@ -37,22 +39,25 @@ $materias = foreach ($it in $items) {
   $titulo = if ($it.title -and $it.title.rendered) { LimpaHtml $it.title.rendered } else { $null }
   $data   = $null
   if ($it.date) { try { $data = Get-Date $it.date } catch { $data = $null } }
-  $img = $null
 
-  if ($it.acf -and $it.acf.imagem_principal -and $it.acf.imagem_principal.Count -gt 0) {
+  # Busca imagem com prioridade: featuredmedia.source_url -> sizes.medium_large -> sizes.medium -> sizes.large
+  $img = $null
+  if ($it._embedded -and $it._embedded."wp:featuredmedia" -and $it._embedded."wp:featuredmedia".Count -gt 0) {
+    $media = $it._embedded."wp:featuredmedia"[0]
+    if ($media -and $media.source_url) { $img = $media.source_url }
+    if (-not $img -and $media.media_details -and $media.media_details.sizes) {
+      if ($media.media_details.sizes.medium_large -and $media.media_details.sizes.medium_large.source_url) { $img = $media.media_details.sizes.medium_large.source_url }
+      elseif ($media.media_details.sizes.medium -and $media.media_details.sizes.medium.source_url) { $img = $media.media_details.sizes.medium.source_url }
+      elseif ($media.media_details.sizes.large -and $media.media_details.sizes.large.source_url) { $img = $media.media_details.sizes.large.source_url }
+    }
+  }
+
+  # Fallback ACF (se existir no site) e GUID de imagem direta
+  if (-not $img -and $it.acf -and $it.acf.imagem_principal -and $it.acf.imagem_principal.Count -gt 0) {
     $acfImg = $it.acf.imagem_principal[0]
     if ($acfImg -and $acfImg.guid) {
       $cand = ($acfImg.guid | Out-String).Trim()
       if ($cand -match "^https?://.*\.(jpg|jpeg|png|webp)($|\?)") { $img = $cand }
-    }
-  }
-  if (-not $img -and $it._embedded -and $it._embedded."wp:featuredmedia" -and $it._embedded."wp:featuredmedia".Count -gt 0) {
-    $media = $it._embedded."wp:featuredmedia"[0]
-    if ($media -and $media.source_url) { $img = $media.source_url }
-    elseif ($media.media_details -and $media.media_details.sizes) {
-      if ($media.media_details.sizes.medium_large -and $media.media_details.sizes.medium_large.source_url) { $img = $media.media_details.sizes.medium_large.source_url }
-      elseif ($media.media_details.sizes.medium -and $media.media_details.sizes.medium.source_url) { $img = $media.media_details.sizes.medium.source_url }
-      elseif ($media.media_details.sizes.large -and $media.media_details.sizes.large.source_url) { $img = $media.media_details.sizes.large.source_url }
     }
   }
   if (-not $img -and $it.guid -and $it.guid.rendered) {
@@ -89,48 +94,24 @@ for ($i=0; $i -lt $top.Count; $i++) {
 
 # ===== Renderização =====
 Add-Type -AssemblyName System.Drawing
+
+# Utilitários de texto com RectangleF para medição consistente
 function DrawWrappedString(
   [System.Drawing.Graphics]$g, [string]$text, [System.Drawing.Font]$font,
-  [System.Drawing.Brush]$brush, [int]$x, [int]$y, [int]$maxWidth, [int]$maxLines
+  [System.Drawing.Brush]$brush, [float]$x, [float]$y, [float]$maxWidth, [int]$maxLines
 ) {
   if ([string]::IsNullOrWhiteSpace($text)) { return 0 }
-  $words = $text -split '\s+'
-  $lines = @()
-  $current = ''
-  foreach ($w in $words) {
-    $trial = if ($current -eq '') { $w } else { $current + ' ' + $w }
-    $size = $g.MeasureString($trial, $font)
-    if ($size.Width -le $maxWidth) { $current = $trial }
-    else {
-      if ($current -ne '') { $lines += $current }
-      $current = $w
-      $wsize = $g.MeasureString($w, $font)
-      if ($wsize.Width -gt $maxWidth) {
-        $part = ''
-        foreach ($c in $w.ToCharArray()) {
-          $t = $part + $c
-          if ($g.MeasureString($t, $font).Width -le $maxWidth) { $part = $t } else { $lines += $part; $part = $c }
-        }
-        if ($part -ne '') { $current = $part }
-      }
-    }
-    if ($lines.Count -ge $maxLines) { break }
-  }
-  if ($current -ne '' -and $lines.Count -lt $maxLines) { $lines += $current }
-  if ($lines.Count -gt $maxLines) { $lines = $lines[0..($maxLines-1)] }
-  if ($lines.Count -eq $maxLines) {
-    $last = $lines[-1]
-    while ($g.MeasureString($last + '…', $font).Width -gt $maxWidth -and $last.Length -gt 0) { $last = $last.Substring(0, $last.Length -1) }
-    $lines[-1] = $last + '…'
-  }
+  $fmt = New-Object System.Drawing.StringFormat
+  $fmt.Trimming   = [System.Drawing.StringTrimming]::EllipsisWord
+  $fmt.FormatFlags = [System.Drawing.StringFormatFlags]::LineLimit
+  $rect = New-Object System.Drawing.RectangleF($x, $y, $maxWidth, 2000.0)
+  $gp = New-Object System.Drawing.Drawing2D.GraphicsPath
+  # Medida aproximada de linha
   $lineHeight = [int]($g.MeasureString('A', $font).Height)
-  $i = 0
-  foreach ($ln in $lines) {
-    $g.DrawString($ln, $font, $brush, $x, $y + ($i * $lineHeight))
-    $i++
-    if ($i -ge $maxLines) { break }
-  }
-  return ($i * $lineHeight)
+  $rect.Height = $lineHeight * [Math]::Max(1,$maxLines)
+  $g.DrawString($text, $font, $brush, $rect, $fmt)
+  $size = $g.MeasureString($text, $font, [int]$maxWidth, $fmt)
+  return [Math]::Min([int][Math]::Ceiling($size.Height), $lineHeight * $maxLines)
 }
 
 $width = 1920; $height = 1080
@@ -153,7 +134,7 @@ $by = - [int](($bh - $height) / 2)
 $g.DrawImage($baseImg, $bx, $by, $bw, $bh)
 $baseImg.Dispose()
 
-# Área segura no verde (ajuste se necessário)
+# Área segura no verde
 $greenSafeLeft   = [int]($width * 0.60)
 $greenSafeRight  = $width - 60
 $greenSafeTop    = 120
@@ -166,12 +147,12 @@ $areaH = ($greenSafeBottom - $greenSafeTop) - (2*$padY)
 
 # Fontes e pincéis
 $headerFont = New-Object System.Drawing.Font("Segoe UI Semibold", 40, [System.Drawing.FontStyle]::Bold)
-$titleFont  = New-Object System.Drawing.Font("Segoe UI", 24, [System.Drawing.FontStyle]::Regular)  # menor para caber 4
+$titleFont  = New-Object System.Drawing.Font("Segoe UI", 24, [System.Drawing.FontStyle]::Regular)
 $dateFont   = New-Object System.Drawing.Font("Segoe UI", 16, [System.Drawing.FontStyle]::Regular)
 $white      = [System.Drawing.Brushes]::White
-# Sombra sutíl para legibilidade
-$shadow     = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(160, 0, 0, 0))
-$muted      = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(235, 245, 245))
+# Sombra e cores com contraste adequado no fundo verde
+$shadow     = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(180, 0, 0, 0))
+$muted      = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(220, 235, 235, 235))
 
 # Título
 $secTitle = "Not"+[char]0x00ED+"cias SEPLAN"
@@ -180,7 +161,7 @@ $g.DrawString($secTitle, $headerFont, $shadow, $xArea+2, $yArea+2)
 $g.DrawString($secTitle, $headerFont, $white,  $xArea,   $yArea)
 $y = $yArea + [int]($g.MeasureString('A', $headerFont).Height) + 10
 
-# 4 itens, sem faixa amarela
+# 4 itens
 $thumbW = 200; $thumbH = 112
 $gapY   = 18
 $boxH   = $thumbH + 62
