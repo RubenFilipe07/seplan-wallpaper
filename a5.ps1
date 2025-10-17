@@ -134,8 +134,8 @@ $g.DrawImage($baseImg, $bx, $by, $bw, $bh)
 $baseImg.Dispose()
 
 # Área segura no verde
-$greenSafeLeft   = [int]($width * 0.60)
-$greenSafeRight  = $width - 60
+$greenSafeLeft   = [int]($width * 0.54)
+$greenSafeRight  = $width 
 $greenSafeTop    = 120
 $greenSafeBottom = $height - 90
 $padX = 24; $padY = 12
@@ -162,7 +162,7 @@ $g.DrawString($secTitle, $headerFont, $white, $xArea, $yArea)
 $y = $yArea + [int]($g.MeasureString('A', $headerFont).Height) + 15
 
 # PROPORÇÃO FIXA para todas as imagens
-$thumbW = 200; $thumbH = 112  # Proporção 16:9 consistente
+$thumbW = 200; $thumbH = 132  # Proporção 16:9 consistente
 $gapY   = 20
 $boxH   = $thumbH + 70  # Mais espaço para texto
 
@@ -246,7 +246,7 @@ $g.FillRectangle($footerBg, $footerRect)
 $g.DrawString($footerText, $footerFont, $darkGreen, $xPos, $yPos)
 
 # Salvar
-$outFile = Join-Path (Get-Location) "wallpaper_melhorado.png"
+$outFile = Join-Path (Get-Location) "wallpaper.png"
 $bmp.Save($outFile, [System.Drawing.Imaging.ImageFormat]::Png)
 
 # Limpeza
@@ -254,4 +254,4 @@ $g.Dispose(); $bmp.Dispose()
 $headerFont.Dispose(); $titleFont.Dispose(); $dateFont.Dispose(); $footerFont.Dispose()
 $lightGray.Dispose(); $darkGreen.Dispose(); $footerBg.Dispose()
 
-Write-Host "Wallpaper melhorado salvo em: $outFile" -ForegroundColor Green
+Write-Host "Wallpaper salvo em: $outFile" -ForegroundColor Green
