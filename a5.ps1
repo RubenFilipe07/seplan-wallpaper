@@ -254,4 +254,18 @@ $g.Dispose(); $bmp.Dispose()
 $headerFont.Dispose(); $titleFont.Dispose(); $dateFont.Dispose(); $footerFont.Dispose()
 $lightGray.Dispose(); $darkGreen.Dispose(); $footerBg.Dispose()
 
+# Apagar miniaturas baixadas (não apagar placeholder)
+foreach ($p in $thumbPaths) {
+  try {
+    if ($p -and (Test-Path $p) -and ($p -ne $placeholder)) { Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue }
+  } catch { }
+}
+
+# Remover diretório thumbs se estiver vazio
+try {
+  if ((Test-Path $thumbsDir) -and ((Get-ChildItem -LiteralPath $thumbsDir -File -Force -ErrorAction SilentlyContinue).Count -eq 0)) {
+    Remove-Item -LiteralPath $thumbsDir -Force -Recurse -ErrorAction SilentlyContinue
+  }
+} catch { }
+
 Write-Host "Wallpaper salvo em: $outFile" -ForegroundColor Green
