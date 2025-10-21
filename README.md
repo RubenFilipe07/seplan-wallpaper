@@ -5,7 +5,7 @@ Este repositório contém scripts PowerShell que geram um papel de parede com as
 
 - Windows PowerShell
 - Ter `fundo.png` no diretório 
-- Conexão com a internet para baixar notícias miniaturas
+- Conexão com a internet para baixar notícias e miniaturas
 - Permissão para executar scripts (use `-ExecutionPolicy Bypass` se necessário)
 
 Como executar:
