@@ -14,10 +14,10 @@ Abra um PowerShell na pasta do projeto e execute:
 
 ```powershell
 # Exemplo: versão simples
-.\a5.ps1
+.\wallpaper-gerador.ps1
 
 # Caso o código acima não funcione
-powershell -NoProfile -ExecutionPolicy Bypass -File .\a5.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\wallpaper-gerador.ps1
 ```
 
 Saída
@@ -30,5 +30,22 @@ Exibindo notícias de: https://www.seplan.rn.gov.br/wp-json/wp/v2/materia?per_pa
 
 São exibidos os 3 itens mais recentes.
 
+# Imagem
 
+Os exemplos abaixo mostram o arquivo de fundo (`fundo.png`) que você deve manter na pasta do projeto e um exemplo do papel de parede gerado (`wallpaper.png`).
+
+Imagem de exemplo do arquivo de fundo (fundo.png):
+
+![Fundo de exemplo](./fundo.png)
+
+Imagem de exemplo do papel de parede gerado (wallpaper.png):
+
+![Papel de parede gerado](./wallpaper.png)
+
+Explicação rápida:
+
+- `fundo.png`: imagem base que será usada como plano de fundo para compor o papel de parede. Deve estar no mesmo diretório do script antes de rodar.
+- `wallpaper.png`: saída gerada pelo script. O nome exato depende de qual versão do script foi executada.
+- `thumbs/`: pasta temporária onde são baixadas as miniaturas das notícias; os arquivos são removidos automaticamente pelo script.
+- Permissões: se o PowerShell bloquear a execução, rode com `-ExecutionPolicy Bypass` ou ajuste a política de execução.
 
